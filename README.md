@@ -21,7 +21,8 @@ The agent sends `{{member.bank_account}}`. T3N fills it inside the enclave.
 | `src/lib/audit.ts` | Local mirror of every consent action, append-only JSONL, plus a summary used by the dashboard. |
 | `src/server.ts` | HTTP API: `/api/status`, `/api/fields`, `/api/consent`, `/api/consent/revoke`, `/api/audit`. |
 | `web/index.html` | Dashboard: tenant and agent DIDs, sealed fields, live grants, activity trail. |
-| `contracts/consent-desk` | Rust → WASM TEE contract (the piece that performs the sealed fill and the allowlisted outbound call). |
+| `contracts/consent-desk` | Rust → WASM TEE contract. `release` performs the sealed fill and the allowlisted outbound call; `ledger` reads back the tenant's own record of every release. |
+| `ci/github-actions.yml` | Build + test definition (native unit tests, `wasm32-wasip2` component, artifact upload). Copy to `.github/workflows/ci.yml` to enable it. |
 
 ## Run it
 
@@ -46,6 +47,8 @@ done, and every ask is checked and recorded.
 
 ## Status
 
-Working: session auth, vault map creation, grant and revoke, activity trail, dashboard.
-Next: deploy the WASM contract, run the first real sealed fill end to end, then onboard
-the first members and publish the demo.
+Working: session auth, vault map creation, grant and revoke, activity trail, dashboard,
+and the TEE contract source (`release` refuses any body without a `{{profile.*}}` marker,
+so a stray call can never leak a plaintext value).
+Next: claim the T3N key, deploy the compiled component, run the first real sealed release
+end to end, then onboard members and cut the demo.
