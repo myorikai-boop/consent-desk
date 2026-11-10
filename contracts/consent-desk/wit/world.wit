@@ -1,0 +1,53 @@
+/// z:consent-desk — the sealed execution half of Consent Desk.
+///
+/// The agent never holds member PII. It builds an outbound request whose body
+/// carries `{{profile.<field>}}` markers, names the member it acts for, and
+/// calls `release`. The host resolves the markers inside the enclave, checks
+/// the member's delegation grant, enforces the contract's egress allowlist,
+/// performs the call, and returns only a status code — never the payload.
+///
+/// Imports are the entire capability set:
+///   - tenant-context:         tenant DID + cluster timestamp
+///   - logging:                operational lines
+///   - kv-store:               append-only consent ledger (z:<tid>:consent_ledger)
+///   - http-with-placeholders: the sealed outbound call
+package z:consent-desk@0.1.0;
+
+world consent-desk {
+    import host:tenant/tenant-context@1.0.0;
+    import host:interfaces/logging@2.1.0;
+    import host:interfaces/kv-store@2.1.0;
+    import host:interfaces/http-with-placeholders@2.1.0;
+
+    export contracts;
+}
+
+interface contracts {
+    record generic-input {
+        input:        option<list<u8>>,
+        user-profile: option<list<u8>>,
+        context:      option<list<u8>>,
+    }
+
+    /// Perform one outbound action on behalf of a member, with their data
+    /// filled only inside the enclave.
+    ///
+    /// Input (JSON):
+    /// {
+    ///   "member_ref": "member-42",              // opaque, not PII
+    ///   "purpose":    "monthly payout",         // shown in the ledger
+    ///   "endpoint":   "https://api.example.com/payouts",
+    ///   "headers":    [["Authorization", "Bearer ..."]],   // optional
+    ///   "body":       { ...anything with {{profile.x}} markers... }
+    /// }
+    ///
+    /// Output (JSON): { status, member_ref, purpose, at, ledger_key, bytes_out }
+    /// The upstream response body is deliberately NOT returned: it can echo
+    /// the very fields the member agreed to keep sealed.
+    release: func(req: generic-input) -> result<list<u8>, string>;
+
+    /// Read the most recent consent-ledger entries for this tenant.
+    /// Input (JSON): { "limit": 20 }
+    /// Output (JSON): { entries: [ { key, member_ref, purpose, endpoint, status, at } ] }
+    ledger: func(req: generic-input) -> result<list<u8>, string>;
+}

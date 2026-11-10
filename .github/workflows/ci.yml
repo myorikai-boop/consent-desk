@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/consent-desk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/consent-desk
+      - name: Native unit tests
+        run: cargo test --lib
+      - name: Build the WASM component
+        run: cargo build --release --target wasm32-wasip2
+      - name: Check artifact
+        run: |
+          ls -la target/wasm32-wasip2/release/*.wasm
+          test -s target/wasm32-wasip2/release/z_consent_desk.wasm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: z-consent-desk-wasm
+          path: contracts/consent-desk/target/wasm32-wasip2/release/z_consent_desk.wasm
