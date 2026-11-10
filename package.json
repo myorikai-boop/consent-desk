@@ -1,0 +1,23 @@
+{
+  "name": "consent-desk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consent Desk — an agent operations layer that lets an AI agent act on a person's private data without ever seeing it. Built on Terminal 3 (T3N).",
+  "scripts": {
+    "connect": "tsx src/connect.ts",
+    "agent": "tsx src/agent.ts",
+    "serve": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@terminal3/t3n-sdk": "latest",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}

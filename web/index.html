@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Consent Desk</title>
+    <style>
+      :root {
+        --bg: #0e0f12;
+        --panel: #16181d;
+        --line: #262a32;
+        --text: #e8e9ec;
+        --muted: #9aa0ac;
+        --gold: #c8a24a;
+        --ok: #4bb27a;
+        --no: #d2603f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.5 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        padding: 22px 28px;
+        border-bottom: 1px solid var(--line);
+      }
+      h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
+      header span { color: var(--muted); font-size: 13px; }
+      main { padding: 24px 28px 60px; max-width: 1080px; }
+      .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 26px; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+      .card .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+      .card .v { font-size: 26px; font-weight: 600; margin-top: 6px; }
+      h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 26px 0 10px; }
+      table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+      th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+      tr:last-child td { border-bottom: 0; }
+      .tag { padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--line); }
+      .allowed { color: var(--ok); border-color: rgba(75, 178, 122, 0.4); }
+      .denied { color: var(--no); border-color: rgba(210, 96, 63, 0.4); }
+      .error { color: var(--no); border-color: rgba(210, 96, 63, 0.4); }
+      code { color: var(--gold); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      .empty { color: var(--muted); font-size: 13px; padding: 14px 0; }
+      footer { color: var(--muted); font-size: 12px; padding: 0 28px 30px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Consent Desk</h1>
+      <span id="env">connecting…</span>
+    </header>
+    <main>
+      <div class="grid">
+        <div class="card"><div class="k">Tenant DID</div><div class="v" style="font-size: 13px" id="tenant">—</div></div>
+        <div class="card"><div class="k">Agent DID</div><div class="v" style="font-size: 13px" id="agent">—</div></div>
+        <div class="card"><div class="k">Allowed actions</div><div class="v" id="allowed">0</div></div>
+        <div class="card"><div class="k">Denied actions</div><div class="v" id="denied">0</div></div>
+      </div>
+
+      <h2>Sealed fields</h2>
+      <table>
+        <thead><tr><th>Member</th><th>Field</th><th>Map</th><th>Placeholder</th></tr></thead>
+        <tbody id="fields"></tbody>
+      </table>
+
+      <h2>Grants</h2>
+      <table>
+        <thead><tr><th>Member</th><th>Grantee</th><th>Function</th><th>Hosts</th></tr></thead>
+        <tbody id="grants"></tbody>
+      </table>
+
+      <h2>Activity trail</h2>
+      <table>
+        <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Subject</th><th>Outcome</th></tr></thead>
+        <tbody id="audit"></tbody>
+      </table>
+    </main>
+    <footer>
+      Values never leave the enclave. The agent sends placeholders; T3N fills them inside the TEE.
+    </footer>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const row = (cells) => {
+        const tr = document.createElement("tr");
+        for (const c of cells) {
+          const td = document.createElement("td");
+          if (c instanceof Node) td.appendChild(c);
+          else td.textContent = c ?? "";
+          tr.appendChild(td);
+        }
+        return tr;
+      };
+      const codeEl = (text) => {
+        const el = document.createElement("code");
+        el.textContent = text;
+        return el;
+      };
+      const tag = (outcome) => {
+        const s = document.createElement("span");
+        s.className = "tag " + outcome;
+        s.textContent = outcome;
+        return s;
+      };
+
+      async function load() {
+        const status = await fetch("/api/status").then((r) => r.json()).catch(() => ({ ok: false }));
+        if (!status.ok) {
+          $("env").textContent = "not connected: " + (status.error || "unknown error");
+          return;
+        }
+        $("env").textContent = status.environment;
+        $("tenant").textContent = status.tenantDid || "—";
+        $("agent").textContent = status.agentDid || "not configured";
+
+        $("fields").innerHTML = "";
+        if (!status.fields.length) {
+          $("fields").appendChild(row([{ textContent: "No sealed fields yet." }]));
+        }
+        for (const f of status.fields) {
+          $("fields").appendChild(row([f.ownerDid, f.label, codeEl(f.mapName), codeEl("{{member." + f.path + "}}")]));
+        }
+
+        $("grants").innerHTML = "";
+        for (const c of status.consents) {
+          for (const g of c.grants) {
+            $("grants").appendChild(row([c.memberDid, g.grantee, g.function, (g.hosts || []).join(", ")]));
+          }
+        }
+
+        const audit = await fetch("/api/audit?limit=100").then((r) => r.json()).catch(() => null);
+        if (!audit || !audit.ok) return;
+        $("allowed").textContent = audit.summary.allowed;
+        $("denied").textContent = audit.summary.denied;
+        $("audit").innerHTML = "";
+        for (const e of audit.events) {
+          $("audit").appendChild(
+            row([new Date(e.at).toLocaleString(), e.actorDid, e.action, e.subjectDid || "—", tag(e.outcome)]),
+          );
+        }
+      }
+      load();
+      setInterval(load, 5000);
+    </script>
+  </body>
+</html>
