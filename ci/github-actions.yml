@@ -1,3 +1,6 @@
+# Not active yet: this token cannot create files under .github/workflows (needs the `workflow`
+# scope). To enable CI, copy this file to .github/workflows/ci.yml from an account with that scope.
+
 name: ci
 
 on:
